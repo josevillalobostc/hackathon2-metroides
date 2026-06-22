@@ -1,6 +1,6 @@
-import React from 'react';
+
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Users, Radio, LogOut } from 'lucide-react';
+import { Activity, LayoutDashboard, Users, Radio, LogOut, Map } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Layout() {
@@ -17,6 +17,7 @@ export default function Layout() {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/tropels', label: 'Atlas de Tropeles', icon: Users },
     { path: '/signals', label: 'Feed de Señales', icon: Radio },
+    { path: '/sectors', label: 'Sectores', icon: Map },
   ];
 
   return (
