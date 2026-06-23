@@ -11,5 +11,25 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Prevent Axios from adding charset=utf-8 which can break strict OpenAPI parsers
+  if (!config.headers['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json';
+  }
   return config;
 });
+
+// Auto-logout on 401: clears stale token and redirects to login
+// so expired tokens never produce cryptic "Error al actualizar" messages.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      // Hard redirect so the AuthProvider re-reads localStorage on mount
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);

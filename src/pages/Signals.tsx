@@ -44,6 +44,7 @@ export default function Signals() {
 
   // Guard against concurrent requests
   const inFlightRef = useRef(false);
+  const isUpdatingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -97,6 +98,9 @@ export default function Signals() {
     setNextCursor(null);
     setHasMore(true);
     setFeedError(null);
+    // Close detail pane so stale signal doesn't remain open after filter change
+    setSelectedSignal(null);
+    setUpdateMsg(null);
 
     if (abortControllerRef.current) abortControllerRef.current.abort();
     const controller = new AbortController();
@@ -161,27 +165,32 @@ export default function Signals() {
 
   // ── Update signal status (Checkpoint 4) ─────────────────────
   const handleUpdateStatus = async (newStatus: string) => {
-    if (!selectedSignal || isUpdating) return;
+    // Use ref to prevent stale closure from blocking retries
+    if (isUpdatingRef.current || !selectedSignal) return;
+    isUpdatingRef.current = true;
     setIsUpdating(true);
     setUpdateMsg(null);
     const snapshot = { ...selectedSignal };
+    const signalId = selectedSignal.id;
 
     try {
-      const response = await api.patch(`/signals/${selectedSignal.id}/status`, { status: newStatus });
+      const response = await api.patch(`/signals/${signalId}/status`, { status: newStatus });
       const updated: Signal = response.data;
-      // Sync the feed list card
+      // Sync the feed list card AND keep detail pane up to date
       setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      // Update the detail pane
       setSelectedSignal(updated);
-      setUpdateMsg({ text: `Señal marcada como ${newStatus} correctamente.`, ok: true });
-    } catch (err) {
+      setUpdateMsg({ text: `✓ Señal marcada como ${updated.status}.`, ok: true });
+    } catch (err: any) {
       setSelectedSignal(snapshot);
-      const e = err as { response?: { data?: { message?: string } } };
+      const e = err as { response?: { status?: number, data?: { message?: string, error?: string } }, message?: string };
+      const apiMsg = e.response?.data?.message || e.response?.data?.error;
+      const status = e.response?.status;
       setUpdateMsg({
-        text: e.response?.data?.message || 'Error al actualizar. Puedes reintentar.',
+        text: `Error ${status || ''}: ${apiMsg || e.message || 'Error al actualizar.'}`,
         ok: false,
       });
     } finally {
+      isUpdatingRef.current = false;
       setIsUpdating(false);
     }
   };

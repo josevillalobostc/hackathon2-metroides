@@ -39,7 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const response = await api.get('/auth/me');
-        setUser(response.data.user);
+        // /auth/me returns the user object directly (not wrapped)
+        setUser(response.data);
       } catch (error) {
         console.error('Session restoration failed:', error);
         logout();
