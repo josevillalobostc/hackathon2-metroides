@@ -8,8 +8,16 @@ interface Tropel {
   name: string;
   species: string;
   vitalState: string;
-  sectorId: string;
+  energyLevel: number;
   chaosIndex: number;
+  mutationStage: number;
+  guardianName: string;
+  sector: {
+    id: string;
+    name: string;
+    sectorCode: string;
+  };
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -48,8 +56,14 @@ export default function Tropels() {
       setError(null);
 
       try {
+        // Omit empty string params — API returns 400 VALIDATION_ERROR for empty strings
+        const params: Record<string, string | number> = { page, size, sort };
+        if (q) params.q = q;
+        if (species) params.species = species;
+        if (vitalState) params.vitalState = vitalState;
+
         const response = await api.get('/tropels', {
-          params: { page, size, q, species, vitalState, sort },
+          params,
           signal: abortControllerRef.current.signal,
         });
         setData(response.data);
@@ -194,8 +208,9 @@ export default function Tropels() {
                 <th className="px-6 py-4 font-medium text-textMuted">Nombre</th>
                 <th className="px-6 py-4 font-medium text-textMuted">Especie</th>
                 <th className="px-6 py-4 font-medium text-textMuted">Estado Vital</th>
+                <th className="px-6 py-4 font-medium text-textMuted">Sector</th>
                 <th className="px-6 py-4 font-medium text-textMuted">Índice Caos</th>
-                <th className="px-6 py-4 font-medium text-textMuted">Actualizado</th>
+                <th className="px-6 py-4 font-medium text-textMuted">Guardián</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surfaceBorder">
@@ -208,6 +223,10 @@ export default function Tropels() {
                       {tropel.vitalState}
                     </span>
                   </td>
+                  <td className="px-6 py-4 text-textMuted text-xs">
+                    <span className="font-mono">{tropel.sector.sectorCode}</span>
+                    <span className="ml-1 text-textMuted/60">· {tropel.sector.name}</span>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-2 bg-surfaceBorder rounded-full overflow-hidden">
@@ -219,9 +238,7 @@ export default function Tropels() {
                       <span className="text-xs text-textMuted">{tropel.chaosIndex}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-textMuted text-xs">
-                    {new Date(tropel.updatedAt).toLocaleString()}
-                  </td>
+                  <td className="px-6 py-4 text-textMuted text-xs">{tropel.guardianName}</td>
                 </tr>
               ))}
             </tbody>

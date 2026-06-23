@@ -76,8 +76,15 @@ export default function Signals() {
       if (isReset) setError(null);
 
       try {
+        // Omit empty string params — API returns 400 VALIDATION_ERROR for empty strings
+        const params: Record<string, string | number> = { limit: 15 };
+        if (cursor) params.cursor = cursor;
+        if (severity) params.severity = severity;
+        if (statusFilter) params.status = statusFilter;
+        if (q) params.q = q;
+
         const response = await api.get('/signals/feed', {
-          params: { cursor, severity, status: statusFilter, q, limit: 15 },
+          params,
           signal: abortControllerRef.current.signal,
         });
 
@@ -121,9 +128,15 @@ export default function Signals() {
     setError(null);
     setInFlight(true);
 
+    // Omit empty string params — API returns 400 VALIDATION_ERROR for empty strings
+    const params: Record<string, string | number> = { limit: 15 };
+    if (severity) params.severity = severity;
+    if (statusFilter) params.status = statusFilter;
+    if (q) params.q = q;
+
     api
       .get('/signals/feed', {
-        params: { cursor: null, severity, status: statusFilter, q, limit: 15 },
+        params,
         signal: controller.signal,
       })
       .then((response) => {
