@@ -1,3 +1,10 @@
+repositorio:
+https://github.com/josevillalobostc/hackathon2-metroides/
+deploy:
+https://hackathon2-metroides.vercel.app/login
+
+
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
