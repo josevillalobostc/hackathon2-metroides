@@ -5,12 +5,17 @@ import { Search, Loader2, RadioReceiver, CheckCircle2 } from 'lucide-react';
 
 interface Signal {
   id: string;
-  title: string;
-  description: string;
+  signalType: string;
   severity: string;
   status: string;
+  rawContent: string;
   createdAt: string;
-  tropelId: string;
+  updatedAt: string;
+  tropel: {
+    id: string;
+    name: string;
+    species: string;
+  };
 }
 
 const severityColor = (s: string) => {
@@ -219,7 +224,7 @@ export default function Signals() {
             onChange={(e) => updateParams({ status: e.target.value })}
           >
             <option value="">Cualquier Estado</option>
-            <option value="NUEVA">Nueva</option>
+            <option value="RECIBIDA">Recibida</option>
             <option value="PROCESANDO">Procesando</option>
             <option value="ATENDIDA">Atendida</option>
           </select>
@@ -242,11 +247,12 @@ export default function Signals() {
                   <RadioReceiver
                     className={`w-4 h-4 ${item.severity === 'CRITICO' ? 'text-accent' : 'text-primary'}`}
                   />
-                  <h3 className="font-semibold text-textMain">{item.title}</h3>
+                  <h3 className="font-semibold text-textMain">{item.signalType.replace('_', ' ')}</h3>
                 </div>
                 <span className="text-xs text-textMuted">{new Date(item.createdAt).toLocaleTimeString()}</span>
               </div>
-              <p className="text-sm text-textMuted line-clamp-2 mb-3">{item.description}</p>
+              <p className="text-sm text-textMuted line-clamp-2 mb-2">{item.rawContent}</p>
+              <p className="text-xs text-textMuted mb-3">Tropel: <span className="text-primary">{item.tropel.name}</span> ({item.tropel.species})</p>
               <div className="flex gap-2">
                 <span className={`text-[10px] px-2 py-1 rounded-full font-medium border ${severityColor(item.severity)}`}>
                   {item.severity}
@@ -295,20 +301,21 @@ export default function Signals() {
 
           <div className="p-6 flex-1 overflow-y-auto">
             <div className="mb-6">
-              <h3 className="text-xl font-bold text-textMain mb-2">{selectedSignal.title}</h3>
-              <p className="text-textMuted">{selectedSignal.description}</p>
+              <h3 className="text-xl font-bold text-textMain mb-1">{selectedSignal.signalType.replace('_', ' ')}</h3>
+              <p className="text-sm text-textMuted font-mono">ID: {selectedSignal.id}</p>
             </div>
 
-            <div className="space-y-4 mb-8">
+            <div className="space-y-3 mb-8">
               <div className="bg-surface/50 p-4 rounded-lg border border-surfaceBorder">
-                <p className="text-sm text-textMuted mb-1">ID Señal</p>
-                <p className="font-mono text-sm break-all">{selectedSignal.id}</p>
+                <p className="text-sm text-textMuted mb-1">Contenido de la Señal</p>
+                <p className="text-sm text-textMain">{selectedSignal.rawContent}</p>
               </div>
               <div className="bg-surface/50 p-4 rounded-lg border border-surfaceBorder">
                 <p className="text-sm text-textMuted mb-1">Tropel Origen</p>
-                <p className="font-mono text-sm break-all">{selectedSignal.tropelId}</p>
+                <p className="font-semibold text-textMain">{selectedSignal.tropel.name}</p>
+                <p className="text-xs text-textMuted">{selectedSignal.tropel.species} · {selectedSignal.tropel.id}</p>
               </div>
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <div className="bg-surface/50 p-4 rounded-lg border border-surfaceBorder flex-1">
                   <p className="text-sm text-textMuted mb-1">Severidad</p>
                   <p className="font-semibold">{selectedSignal.severity}</p>

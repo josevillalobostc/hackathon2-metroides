@@ -5,8 +5,12 @@ import { Map, Loader2, AlertCircle } from 'lucide-react';
 
 interface Sector {
   id: string;
+  sectorCode: string;
   name: string;
-  status: string;
+  climate: string;
+  capacity: number;
+  currentLoad: number;
+  stabilityLevel: number;
 }
 
 export default function Sectors() {
@@ -18,7 +22,7 @@ export default function Sectors() {
     const fetchSectors = async () => {
       try {
         const response = await api.get('/sectors');
-        setSectors(response.data);
+        setSectors(response.data.items);
       } catch (err: any) {
         setError(err.response?.data?.message || 'Error al cargar los sectores');
       } finally {
@@ -62,9 +66,28 @@ export default function Sectors() {
                 <div className="p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
                   <Map className="w-6 h-6 text-primary" />
                 </div>
-                <h2 className="text-xl font-semibold text-textMain">{sector.name}</h2>
+                <div>
+                  <h2 className="text-xl font-semibold text-textMain">{sector.name}</h2>
+                  <p className="text-xs text-textMuted font-mono">{sector.sectorCode} · {sector.climate.replace('_', ' ')}</p>
+                </div>
               </div>
-              <p className="text-textMuted text-sm">Ver historia narrativa →</p>
+              <div className="flex justify-between text-sm text-textMuted mb-2">
+                <span>Carga</span>
+                <span className="font-mono">{sector.currentLoad}/{sector.capacity}</span>
+              </div>
+              <div className="w-full bg-surfaceBorder rounded-full h-1.5 mb-3">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${(sector.currentLoad / sector.capacity) * 100}%`,
+                    backgroundColor: sector.stabilityLevel >= 70 ? 'var(--color-success, #22c55e)' : sector.stabilityLevel >= 40 ? 'var(--color-warning, #f59e0b)' : 'var(--color-accent, #ef4444)'
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-textMuted">Estabilidad</span>
+                <span className="font-mono font-bold" style={{ color: sector.stabilityLevel >= 70 ? '#22c55e' : sector.stabilityLevel >= 40 ? '#f59e0b' : '#ef4444' }}>{sector.stabilityLevel}%</span>
+              </div>
             </Link>
           ))}
         </div>

@@ -88,9 +88,11 @@ export default function Tropels() {
   };
 
   const vitalStateColor = (state: string) => {
-    if (state === 'SANO') return 'bg-success/10 text-success border-success/20';
-    if (state === 'HERIDO') return 'bg-warning/10 text-warning border-warning/20';
-    return 'bg-accent/10 text-accent border-accent/20';
+    if (state === 'ESTABLE') return 'bg-success/10 text-success border-success/20';
+    if (state === 'HAMBRIENTO') return 'bg-warning/10 text-warning border-warning/20';
+    if (state === 'AGITADO') return 'bg-secondary/10 text-secondary border-secondary/20';
+    if (state === 'MUTANDO') return 'bg-primary/10 text-primary border-primary/20';
+    return 'bg-accent/10 text-accent border-accent/20'; // CRITICO
   };
 
   return (
@@ -117,12 +119,27 @@ export default function Tropels() {
 
         <select
           className="bg-surface/50 border border-surfaceBorder rounded-lg px-4 py-2 text-textMain text-sm input-glow"
+          value={species}
+          onChange={(e) => updateParams({ species: e.target.value })}
+        >
+          <option value="">Cualquier especie</option>
+          <option value="BLOBITO">Blobito</option>
+          <option value="CHISPA">Chispa</option>
+          <option value="GRUNON">Gruñón</option>
+          <option value="DORMILON">Dormilón</option>
+          <option value="GLITCHY">Glitchy</option>
+        </select>
+
+        <select
+          className="bg-surface/50 border border-surfaceBorder rounded-lg px-4 py-2 text-textMain text-sm input-glow"
           value={vitalState}
           onChange={(e) => updateParams({ vitalState: e.target.value })}
         >
           <option value="">Cualquier estado</option>
-          <option value="SANO">Sano</option>
-          <option value="HERIDO">Herido</option>
+          <option value="ESTABLE">Estable</option>
+          <option value="HAMBRIENTO">Hambriento</option>
+          <option value="AGITADO">Agitado</option>
+          <option value="MUTANDO">Mutando</option>
           <option value="CRITICO">Crítico</option>
         </select>
 
