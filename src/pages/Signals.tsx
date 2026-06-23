@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 import { api } from '../api';
-import { Search, Loader2, RadioReceiver, CheckCircle2 } from 'lucide-react';
+import { Search, Loader2, RadioReceiver, CheckCircle2, Clock } from 'lucide-react';
 
 interface Signal {
   id: string;
@@ -21,6 +22,7 @@ interface Signal {
 const severityColor = (s: string) => {
   if (s === 'CRITICO') return 'bg-accent/10 border-accent/30 text-accent';
   if (s === 'GRAVE') return 'bg-warning/10 border-warning/30 text-warning';
+  if (s === 'MODERADO') return 'bg-secondary/10 border-secondary/30 text-secondary';
   return 'bg-surface border-surfaceBorder text-textMuted';
 };
 
@@ -32,22 +34,25 @@ const statusColor = (s: string) => {
 
 export default function Signals() {
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Feed state
   const [items, setItems] = useState<Signal[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [inFlight, setInFlight] = useState(false); // single-flight guard
 
-  // Checkpoint 4: signal detail + update
+  // Guard against concurrent requests
+  const inFlightRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Detail pane state
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateMsg, setUpdateMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const observerTarget = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // URL filters (persisted in URL — Checkpoint 3 requirement)
+  // URL filters
   const severity = searchParams.get('severity') || '';
   const statusFilter = searchParams.get('status') || '';
   const q = searchParams.get('q') || '';
@@ -61,138 +66,119 @@ export default function Signals() {
     setSearchParams(newParams);
   };
 
-  const loadFeed = useCallback(
-    async (cursor: string | null, isReset: boolean = false) => {
-      // Single-flight: don't fire if already in flight
-      if (inFlight) return;
-      if (!isReset && !hasMore) return;
+  // ── Core fetch helper ─────────────────────────────────────────
+  const fetchPage = useCallback(
+    async (cursor: string | null, signal: AbortSignal): Promise<void> => {
+      const params: Record<string, string | number> = { limit: 15 };
+      if (cursor) params.cursor = cursor;
+      if (severity) params.severity = severity;
+      if (statusFilter) params.status = statusFilter;
+      if (q) params.q = q;
 
-      // Cancel any previous stale request
-      if (abortControllerRef.current) abortControllerRef.current.abort();
-      abortControllerRef.current = new AbortController();
+      const response = await api.get('/signals/feed', { params, signal });
+      const { items: newItems, nextCursor: newCursor, hasMore: newHasMore } = response.data;
 
-      setInFlight(true);
-      setLoading(true);
-      if (isReset) setError(null);
-
-      try {
-        // Omit empty string params — API returns 400 VALIDATION_ERROR for empty strings
-        const params: Record<string, string | number> = { limit: 15 };
-        if (cursor) params.cursor = cursor;
-        if (severity) params.severity = severity;
-        if (statusFilter) params.status = statusFilter;
-        if (q) params.q = q;
-
-        const response = await api.get('/signals/feed', {
-          params,
-          signal: abortControllerRef.current.signal,
-        });
-
-        const { items: newItems, nextCursor: newCursor, hasMore: newHasMore } = response.data;
-
-        setItems((prev) => {
-          if (isReset) return newItems;
-          // Deduplication by ID (Checkpoint 3 requirement)
-          const existingIds = new Set(prev.map((i) => i.id));
-          const unique = (newItems as Signal[]).filter((item) => !existingIds.has(item.id));
-          return [...prev, ...unique];
-        });
-        setNextCursor(newCursor);
-        setHasMore(newHasMore);
-        setError(null);
-      } catch (err: any) {
-        if (err.name !== 'CanceledError') {
-          setError(err.response?.data?.message || 'Error cargando el feed');
-        }
-      } finally {
-        setLoading(false);
-        setInFlight(false);
-      }
+      setItems((prev) => {
+        const existingIds = new Set(prev.map((i) => i.id));
+        const unique = (newItems as Signal[]).filter((item) => !existingIds.has(item.id));
+        return cursor ? [...prev, ...unique] : newItems; // cursor=null means reset
+      });
+      setNextCursor(newCursor);
+      setHasMore(newHasMore);
+      setFeedError(null);
     },
-    [severity, statusFilter, q, hasMore, inFlight]
+    [severity, statusFilter, q]
   );
 
-  // Reset feed on filter change
+  // ── Reset feed on filter change ────────────────────────────────
   useEffect(() => {
+    // Reset all feed state immediately
     setItems([]);
     setNextCursor(null);
     setHasMore(true);
+    setFeedError(null);
 
-    // Small trick: we need loadFeed to run once with cursor=null, isReset=true.
-    // We can't put loadFeed in deps or it creates an infinite loop.
-    // Use the ref for the abort controller directly.
+    if (abortControllerRef.current) abortControllerRef.current.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-
+    inFlightRef.current = true;
     setLoading(true);
-    setError(null);
-    setInFlight(true);
 
-    // Omit empty string params — API returns 400 VALIDATION_ERROR for empty strings
-    const params: Record<string, string | number> = { limit: 15 };
-    if (severity) params.severity = severity;
-    if (statusFilter) params.status = statusFilter;
-    if (q) params.q = q;
-
-    api
-      .get('/signals/feed', {
-        params,
-        signal: controller.signal,
-      })
-      .then((response) => {
-        const { items: newItems, nextCursor: newCursor, hasMore: newHasMore } = response.data;
-        setItems(newItems);
-        setNextCursor(newCursor);
-        setHasMore(newHasMore);
-        setError(null);
-      })
+    fetchPage(null, controller.signal)
       .catch((err) => {
-        if (err.name !== 'CanceledError') {
-          setError(err.response?.data?.message || 'Error cargando el feed');
+        if (!axios.isCancel(err)) {
+          const e = err as { response?: { data?: { message?: string } } };
+          setFeedError(e.response?.data?.message || 'Error cargando el feed');
         }
       })
       .finally(() => {
         setLoading(false);
-        setInFlight(false);
+        inFlightRef.current = false;
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      inFlightRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [severity, statusFilter, q]);
 
-  // IntersectionObserver for infinite scroll (Checkpoint 3)
+  // ── Load next page (infinite scroll) ──────────────────────────
+  const loadNextPage = useCallback(async () => {
+    if (inFlightRef.current || !hasMore || !nextCursor) return;
+
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    inFlightRef.current = true;
+    setLoading(true);
+
+    try {
+      await fetchPage(nextCursor, controller.signal);
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        const e = err as { response?: { data?: { message?: string } } };
+        setFeedError(e.response?.data?.message || 'Error cargando más señales');
+      }
+    } finally {
+      setLoading(false);
+      inFlightRef.current = false;
+    }
+  }, [fetchPage, hasMore, nextCursor]);
+
+  // ── IntersectionObserver for infinite scroll ────────────────
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !error && !inFlight) {
-          loadFeed(nextCursor, false);
-        }
+        if (entries[0].isIntersecting) loadNextPage();
       },
-      { threshold: 0.5 }
+      { threshold: 0.1 }
     );
-
     const target = observerTarget.current;
     if (target) observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, loading, error, nextCursor, inFlight, loadFeed]);
+  }, [loadNextPage]);
 
-  // Checkpoint 4: update signal status
+  // ── Update signal status (Checkpoint 4) ─────────────────────
   const handleUpdateStatus = async (newStatus: string) => {
-    if (!selectedSignal) return;
+    if (!selectedSignal || isUpdating) return;
     setIsUpdating(true);
     setUpdateMsg(null);
-    const originalSignal = { ...selectedSignal };
+    const snapshot = { ...selectedSignal };
 
     try {
       const response = await api.patch(`/signals/${selectedSignal.id}/status`, { status: newStatus });
-      // Sync back into the feed list
-      setItems((prev) => prev.map((item) => (item.id === selectedSignal.id ? response.data : item)));
-      setSelectedSignal(response.data);
-      setUpdateMsg({ text: 'Estado actualizado correctamente.', ok: true });
-    } catch (err: any) {
-      setSelectedSignal(originalSignal); // revert in panel
+      const updated: Signal = response.data;
+      // Sync the feed list card
+      setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      // Update the detail pane
+      setSelectedSignal(updated);
+      setUpdateMsg({ text: `Señal marcada como ${newStatus} correctamente.`, ok: true });
+    } catch (err) {
+      setSelectedSignal(snapshot);
+      const e = err as { response?: { data?: { message?: string } } };
       setUpdateMsg({
-        text: err.response?.data?.message || 'Error al actualizar señal. Puedes reintentar.',
+        text: e.response?.data?.message || 'Error al actualizar. Puedes reintentar.',
         ok: false,
       });
     } finally {
@@ -208,7 +194,7 @@ export default function Signals() {
           selectedSignal ? 'hidden md:flex md:w-1/2 lg:w-2/3' : 'w-full'
         }`}
       >
-        {/* Filters (URL-persisted) */}
+        {/* Filters */}
         <div className="glass-panel p-4 mb-4 flex flex-wrap gap-4 shrink-0">
           <div className="flex-1 min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted" />
@@ -243,13 +229,17 @@ export default function Signals() {
           </select>
         </div>
 
-        {/* Scrollable feed — scroll position is preserved because the list is never unmounted */}
+        {/* Feed */}
         <div className="glass-panel flex-1 overflow-y-auto overflow-x-hidden relative p-4 space-y-4">
           {items.map((item) => (
             <div
               key={item.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Señal ${item.signalType} - ${item.status}`}
               onClick={() => { setSelectedSignal(item); setUpdateMsg(null); }}
-              className={`p-4 rounded-xl border transition-all cursor-pointer hover:scale-[1.01] ${
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setSelectedSignal(item); setUpdateMsg(null); } }}
+              className={`p-4 rounded-xl border transition-all cursor-pointer hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                 selectedSignal?.id === item.id
                   ? 'border-primary bg-primary/5 shadow-[0_0_15px_rgba(0,229,255,0.1)]'
                   : 'border-surfaceBorder bg-surface/40 hover:border-textMuted/50'
@@ -260,12 +250,14 @@ export default function Signals() {
                   <RadioReceiver
                     className={`w-4 h-4 ${item.severity === 'CRITICO' ? 'text-accent' : 'text-primary'}`}
                   />
-                  <h3 className="font-semibold text-textMain">{item.signalType.replace('_', ' ')}</h3>
+                  <h3 className="font-semibold text-textMain">{item.signalType.replace(/_/g, ' ')}</h3>
                 </div>
                 <span className="text-xs text-textMuted">{new Date(item.createdAt).toLocaleTimeString()}</span>
               </div>
               <p className="text-sm text-textMuted line-clamp-2 mb-2">{item.rawContent}</p>
-              <p className="text-xs text-textMuted mb-3">Tropel: <span className="text-primary">{item.tropel.name}</span> ({item.tropel.species})</p>
+              <p className="text-xs text-textMuted mb-3">
+                Tropel: <span className="text-primary">{item.tropel.name}</span> ({item.tropel.species})
+              </p>
               <div className="flex gap-2">
                 <span className={`text-[10px] px-2 py-1 rounded-full font-medium border ${severityColor(item.severity)}`}>
                   {item.severity}
@@ -277,22 +269,21 @@ export default function Signals() {
             </div>
           ))}
 
-          {/* Sentinel for IntersectionObserver */}
+          {/* Sentinel */}
           <div ref={observerTarget} className="h-10 flex items-center justify-center mt-4">
             {loading && <Loader2 className="w-6 h-6 text-primary animate-spin" />}
-            {!hasMore && items.length > 0 && <p className="text-textMuted text-sm">— Fin del feed —</p>}
-            {error && !loading && (
+            {!hasMore && items.length > 0 && !loading && (
+              <p className="text-textMuted text-sm">— Fin del feed —</p>
+            )}
+            {feedError && !loading && (
               <div className="text-center">
-                <p className="text-accent text-sm mb-2">{error}</p>
-                <button
-                  onClick={() => loadFeed(nextCursor, false)}
-                  className="btn-secondary text-xs"
-                >
+                <p className="text-accent text-sm mb-2">{feedError}</p>
+                <button onClick={loadNextPage} className="btn-secondary text-xs">
                   Reintentar
                 </button>
               </div>
             )}
-            {!loading && !error && items.length === 0 && (
+            {!loading && !feedError && items.length === 0 && (
               <p className="text-textMuted text-sm">No se encontraron señales</p>
             )}
           </div>
@@ -306,7 +297,8 @@ export default function Signals() {
             <h2 className="font-bold text-lg text-textMain truncate">Detalle de Señal</h2>
             <button
               onClick={() => setSelectedSignal(null)}
-              className="p-2 text-textMuted hover:text-textMain transition-colors"
+              aria-label="Cerrar panel"
+              className="p-2 text-textMuted hover:text-textMain transition-colors rounded-lg hover:bg-surfaceBorder/50"
             >
               ✕
             </button>
@@ -314,7 +306,9 @@ export default function Signals() {
 
           <div className="p-6 flex-1 overflow-y-auto">
             <div className="mb-6">
-              <h3 className="text-xl font-bold text-textMain mb-1">{selectedSignal.signalType.replace('_', ' ')}</h3>
+              <h3 className="text-xl font-bold text-textMain mb-1">
+                {selectedSignal.signalType.replace(/_/g, ' ')}
+              </h3>
               <p className="text-sm text-textMuted font-mono">ID: {selectedSignal.id}</p>
             </div>
 
@@ -331,18 +325,24 @@ export default function Signals() {
               <div className="flex gap-3">
                 <div className="bg-surface/50 p-4 rounded-lg border border-surfaceBorder flex-1">
                   <p className="text-sm text-textMuted mb-1">Severidad</p>
-                  <p className="font-semibold">{selectedSignal.severity}</p>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium border ${severityColor(selectedSignal.severity)}`}>
+                    {selectedSignal.severity}
+                  </span>
                 </div>
                 <div className="bg-surface/50 p-4 rounded-lg border border-surfaceBorder flex-1">
                   <p className="text-sm text-textMuted mb-1">Estado Actual</p>
-                  <p className="font-semibold">{selectedSignal.status}</p>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium border ${statusColor(selectedSignal.status)}`}>
+                    {selectedSignal.status}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Inline feedback — no alert() */}
+            {/* Feedback */}
             {updateMsg && (
               <div
+                role="status"
+                aria-live="polite"
                 className={`mb-4 p-3 rounded-lg text-sm ${
                   updateMsg.ok
                     ? 'bg-success/10 border border-success/30 text-success'
@@ -353,8 +353,10 @@ export default function Signals() {
               </div>
             )}
 
+            {/* Actions */}
             <div className="space-y-3">
               <h4 className="font-semibold text-textMain mb-2">Acciones Operativas</h4>
+
               <button
                 className="w-full btn-secondary flex items-center justify-center gap-2"
                 onClick={() => handleUpdateStatus('PROCESANDO')}
@@ -363,18 +365,21 @@ export default function Signals() {
                   selectedSignal.status === 'PROCESANDO' ||
                   selectedSignal.status === 'ATENDIDA'
                 }
+                aria-label="Marcar señal como Procesando"
               >
                 {isUpdating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Loader2 className="w-4 h-4" />
+                  <Clock className="w-4 h-4" />
                 )}
                 Marcar como Procesando
               </button>
+
               <button
                 className="w-full btn-primary flex items-center justify-center gap-2"
                 onClick={() => handleUpdateStatus('ATENDIDA')}
                 disabled={isUpdating || selectedSignal.status === 'ATENDIDA'}
+                aria-label="Marcar señal como Atendida"
               >
                 {isUpdating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

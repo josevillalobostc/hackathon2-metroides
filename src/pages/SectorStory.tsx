@@ -31,8 +31,9 @@ export default function SectorStory() {
         const stagesData: StoryStage[] = response.data.stages ?? response.data;
         setStages(stagesData);
         if (stagesData.length > 0) setActiveStageId(stagesData[0].id);
-      } catch (err: any) {
-        setError(err.response?.data?.message || 'Error cargando la historia del sector');
+      } catch (err) {
+        const e = err as { response?: { data?: { message?: string } } };
+        setError(e.response?.data?.message || 'Error cargando la historia del sector');
       } finally {
         setLoading(false);
       }
@@ -191,6 +192,18 @@ export default function SectorStory() {
                 key={stage.id}
                 id={stage.id}
                 tabIndex={0}
+                role="article"
+                aria-label={`Fase ${stage.order + 1}: ${stage.title}`}
+                aria-current={activeStageId === stage.id ? 'true' : undefined}
+                onFocus={() => setActiveStageId(stage.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveStageId(stage.id);
+                    // Scroll into view for keyboard users
+                    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }}
                 className={`story-step glass-panel p-8 motion-safe:transition-all motion-safe:duration-700 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                   activeStageId === stage.id
                     ? 'opacity-100 translate-x-0 border-primary shadow-[0_0_20px_rgba(0,229,255,0.15)] scale-100'
@@ -199,7 +212,7 @@ export default function SectorStory() {
               >
                 <div className="text-primary font-mono text-sm mb-4 tracking-wider">FASE {stage.order + 1}</div>
                 <h2 className="text-3xl font-bold text-textMain mb-3">{stage.title}</h2>
-                <p className="text-sm font-mono text-textMuted mb-4 uppercase tracking-widest">Evento: {stage.dominantEvent.replace('_', ' ')}</p>
+                <p className="text-sm font-mono text-textMuted mb-4 uppercase tracking-widest">Evento: {stage.dominantEvent.replace(/_/g, ' ')}</p>
                 <p className="text-lg text-textMuted leading-relaxed">{stage.narrative}</p>
               </div>
             ))}
