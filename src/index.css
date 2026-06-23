@@ -28,3 +28,31 @@
     @apply bg-surface border border-surfaceBorder text-textMain font-medium px-4 py-2 rounded-lg hover:bg-surfaceBorder transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 }
+
+/* View Transitions Baseline (Router applies its own, but we can tweak if needed) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
+}
+
+/* Checkpoint 5: CSS Scroll-driven animations fallback / override */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .scroll-progress-bar {
+      opacity: 1 !important;
+      transform-origin: 0% 50%;
+      animation: scaleProgress linear;
+      /* Bind to the nearest block scroll container */
+      animation-timeline: scroll(nearest block);
+    }
+    
+    .fallback-progress {
+      opacity: 0.2 !important;
+    }
+  }
+}
+
+@keyframes scaleProgress {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}

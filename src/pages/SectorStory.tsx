@@ -80,45 +80,48 @@ export default function SectorStory() {
   const activeStage = stages.find((s) => s.id === activeStageId) ?? stages[0];
 
   return (
-    <div className="relative flex flex-col md:flex-row h-[calc(100vh-80px)] overflow-hidden">
+    <div 
+      className="relative flex flex-col md:flex-row h-[calc(100vh-80px)] overflow-hidden"
+      style={{ viewTransitionName: `sector-${id}` }}
+    >
 
       <div className="w-full md:w-1/2 h-[40vh] md:h-full sticky top-0 md:relative bg-surface/30 border-b md:border-b-0 md:border-r border-surfaceBorder overflow-hidden flex items-center justify-center p-8">
         <div
           key={activeStage?.id}
-          className="animate-in fade-in zoom-in duration-700 relative w-full h-full flex flex-col items-center justify-center gap-6"
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in duration-700 relative w-full h-full flex flex-col items-center justify-center gap-6"
         >
           {/* Dynamic visual based on dominantEvent */}
           {activeStage?.dominantEvent === 'HAMBRE' && (
             <div className="relative flex items-center justify-center">
-              <div className="w-24 h-24 bg-warning/20 rounded-full blur-xl animate-pulse" />
-              <div className="absolute w-16 h-16 border-4 border-warning/60 rounded-full animate-ping" />
+              <div className="w-24 h-24 bg-warning/20 rounded-full blur-xl motion-safe:animate-pulse" />
+              <div className="absolute w-16 h-16 border-4 border-warning/60 rounded-full motion-safe:animate-ping" />
               <span className="absolute text-3xl">🍖</span>
             </div>
           )}
           {activeStage?.dominantEvent === 'MUTACION' && (
             <div className="relative flex items-center justify-center">
-              <div className="w-32 h-32 border-2 border-secondary/50 rounded-full animate-spin" style={{ animationDuration: '6s' }} />
-              <div className="absolute w-20 h-20 bg-secondary/20 rounded-full blur-xl animate-pulse" />
+              <div className="w-32 h-32 border-2 border-secondary/50 rounded-full motion-safe:animate-spin" style={{ animationDuration: '6s' }} />
+              <div className="absolute w-20 h-20 bg-secondary/20 rounded-full blur-xl motion-safe:animate-pulse" />
               <span className="absolute text-3xl">🧬</span>
             </div>
           )}
           {activeStage?.dominantEvent === 'FUGA' && (
             <div className="relative flex items-center justify-center">
-              <div className="w-28 h-28 border-2 border-primary/40 rounded-full animate-ping" style={{ animationDuration: '1.5s' }} />
+              <div className="w-28 h-28 border-2 border-primary/40 rounded-full motion-safe:animate-ping" style={{ animationDuration: '1.5s' }} />
               <span className="absolute text-3xl">💨</span>
             </div>
           )}
           {activeStage?.dominantEvent === 'CONFLICTO' && (
             <div className="relative flex items-center justify-center">
-              <div className="w-16 h-16 bg-accent rounded-full z-10 shadow-[0_0_30px_rgba(255,0,85,0.8)] animate-pulse" />
-              <div className="absolute w-32 h-32 border-4 border-accent/50 rounded-full animate-ping" />
+              <div className="w-16 h-16 bg-accent rounded-full z-10 shadow-[0_0_30px_rgba(255,0,85,0.8)] motion-safe:animate-pulse" />
+              <div className="absolute w-32 h-32 border-4 border-accent/50 rounded-full motion-safe:animate-ping" />
               <span className="absolute text-2xl z-20">⚡</span>
             </div>
           )}
           {activeStage?.dominantEvent === 'REPRODUCCION_MASIVA' && (
             <div className="flex items-end gap-3 h-32">
               {[60, 80, 100, 70, 90].map((h, i) => (
-                <div key={i} className="w-8 bg-success/50 rounded-t-sm animate-bounce" style={{ height: `${h}%`, animationDelay: `${i * 0.15}s` }} />
+                <div key={i} className="w-8 bg-success/50 rounded-t-sm motion-safe:animate-bounce" style={{ height: `${h}%`, animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
           )}
@@ -130,12 +133,12 @@ export default function SectorStory() {
           )}
           {activeStage?.dominantEvent === 'SENAL_CORRUPTA' && (
             <div className="relative flex items-center justify-center">
-              <div className="w-24 h-24 border border-primary/30 rounded-lg rotate-45 animate-spin" style={{ animationDuration: '4s' }} />
+              <div className="w-24 h-24 border border-primary/30 rounded-lg rotate-45 motion-safe:animate-spin" style={{ animationDuration: '4s' }} />
               <span className="absolute text-3xl">📡</span>
             </div>
           )}
           {!activeStage?.dominantEvent && (
-            <div className="w-32 h-32 bg-primary/20 rounded-full blur-xl animate-pulse" />
+            <div className="w-32 h-32 bg-primary/20 rounded-full blur-xl motion-safe:animate-pulse" />
           )}
 
           {/* Metrics card */}
@@ -155,29 +158,32 @@ export default function SectorStory() {
       </div>
 
       {/* ── Scrollytelling Text ───────────────────────── */}
-      <div className="w-full md:w-1/2 overflow-y-auto scroll-smooth">
-        <div className="p-8 pb-[60vh]">
+      <div className="w-full md:w-1/2 overflow-y-auto scroll-smooth relative">
+        {/* Sticky progress indicator */}
+        <div className="sticky top-0 bg-background/80 backdrop-blur-sm z-20 px-8 py-4 border-b border-surfaceBorder/50">
           <Link
             to="/sectors"
-            className="inline-flex items-center text-textMuted hover:text-primary transition-colors mb-12"
+            viewTransition
+            className="inline-flex items-center text-textMuted hover:text-primary transition-colors mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Sectores
           </Link>
-
-          <h1 className="text-4xl font-bold text-textMain mb-16">Historia del Sector</h1>
-
-          {/* Progress indicator */}
-          <div className="flex gap-2 mb-16">
+          <div className="flex gap-2 relative">
             {stages.map((s) => (
               <div
                 key={s.id}
-                className={`h-1 flex-1 rounded-full transition-all duration-500 ${
+                className={`fallback-progress h-1 flex-1 rounded-full motion-safe:transition-all motion-safe:duration-500 ${
                   s.id === activeStageId ? 'bg-primary' : 'bg-surfaceBorder'
                 }`}
               />
             ))}
+            <div className="scroll-progress-bar absolute top-0 left-0 h-full w-full bg-primary rounded-full pointer-events-none opacity-0" />
           </div>
+        </div>
+
+        <div className="p-8 pb-[60vh] pt-12">
+          <h1 className="text-4xl font-bold text-textMain mb-16">Historia del Sector</h1>
 
           <div className="space-y-[40vh]">
             {stages.map((stage) => (
@@ -185,7 +191,7 @@ export default function SectorStory() {
                 key={stage.id}
                 id={stage.id}
                 tabIndex={0}
-                className={`story-step glass-panel p-8 transition-all duration-700 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                className={`story-step glass-panel p-8 motion-safe:transition-all motion-safe:duration-700 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                   activeStageId === stage.id
                     ? 'opacity-100 translate-x-0 border-primary shadow-[0_0_20px_rgba(0,229,255,0.15)] scale-100'
                     : 'opacity-40 -translate-x-4 border-surfaceBorder scale-95'

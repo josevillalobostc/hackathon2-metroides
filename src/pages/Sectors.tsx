@@ -60,7 +60,9 @@ export default function Sectors() {
             <Link
               key={sector.id}
               to={`/sectors/${sector.id}/story`}
+              viewTransition
               className="glass-panel p-6 hover:border-primary hover:shadow-[0_0_15px_rgba(0,229,255,0.2)] transition-all group"
+              style={{ viewTransitionName: `sector-${sector.id}` }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
